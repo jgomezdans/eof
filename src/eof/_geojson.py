@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from os import PathLike
 import re
-from shapely import wkt as swkt, make_valid
+from shapely import wkt as swkt, make_valid, force_2d
 from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 
@@ -40,7 +40,7 @@ def _valid(geom: BaseGeometry) -> BaseGeometry:
     """
     return geom if geom.is_valid else make_valid(geom)
 
-def load_geometry(
+def load_geojson(
     source: str | PathLike | BaseGeometry
 ) -> BaseGeometry:
     """
@@ -71,7 +71,7 @@ def load_geometry(
     """
     # Pass-through: if already BaseGeometry, validate and return
     if isinstance(source, BaseGeometry):
-        return _valid(source)
+        return _valid(force_2d(source))
 
     if isinstance(source, PathLike):
         return _load_file(Path(source))
@@ -90,7 +90,8 @@ def load_geometry(
             pattern = rf'{wkt_keywords}(?:\s+Z)?\s*\(.*\)'
             match = re.search(pattern, s, re.IGNORECASE)
             wkt_text = match.group(0) if match else s
-            return _valid(swkt.loads(wkt_text))
+            geom = _valid(force_2d(swkt.loads(wkt_text)))
+            return geom
         except Exception:
             pass
 
@@ -103,3 +104,4 @@ def load_geometry(
         "Input must be valid WKT, a GeoJSON file path, or a "
         "BaseGeometry object"
     )
+
