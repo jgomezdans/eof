@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "EO Fetch: Download and cache multi-sensor Earth Observation data from multiple platforms"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 authors = [
     {name = "Feng Yin", email = "ucfafyi@ucl.ac.uk"},
     {name = "P. Lewis"},
@@ -26,11 +26,16 @@ dependencies = [
 [project.optional-dependencies]
 planetary = ["planetary-computer"]
 gee = ["earthengine-api"]
+xr = ["xarray", "dask[array]", "rasterio", "rioxarray", "pyproj", "zarr<3", "numcodecs", "scipy"]
 all = ["planetary-computer", "earthengine-api"]
-dev = ["pytest", "pytest-cov", "ruff"]
+dev = ["pytest", "pytest-cov", "ruff", "pvlib"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
 eof = ["test_data/*.geojson", "data/*.npz", "data/*.json"]
+
+[tool.pytest.ini_options]
+markers = ["network: needs internet access (and Earthdata login for ECOSTRESS)"]
+addopts = "-m 'not network'"

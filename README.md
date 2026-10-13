@@ -110,6 +110,63 @@ timings = eof.benchmark_sources()
 timings = eof.benchmark_sources(sensors=['sentinel2', 'landsat'])
 ```
 
+## Lazy xarray API: Sentinel-2 + ECOSTRESS (`eof.xr`)
+
+Point at an AOI and a period; get everything available as lazy,
+dask-backed `xarray.Dataset`s on each sensor's native tile grid.
+
+```python
+import eof.xr as eox
+
+data = eox.open_aoi("field.geojson", "2022-06-01", "2022-08-31")
+# or a flux tower: eox.open_aoi((-96.4701, 41.1651), ..., buffer_m=1500)
+
+data["s2"]              # S2 L2A BOA reflectance, 10 bands, 10 m
+data["ecostress"]       # ECOSTRESS L1CT TOA radiance, TIR2/4/5, 70 m
+data["ecostress_lste"]  # ECOSTRESS L2T land surface temperature, 70 m
+
+s2 = data["s2"]
+clear = s2.valid.where(s2.inside_aoi > 0.5).mean(("x", "y")).compute()
+good = s2.isel(time=clear.values > 0.9).compute()      # reads only now
+
+s2_70m = eox.aggregate_to(s2, data["ecostress"])       # 7 x 7 block mean
+eox.to_zarr_cache(good, "us-ne1_s2.zarr")              # keep a local copy
+```
+
+* **AOI**: GeoJSON path/dict, WKT, shapely geometry, GeoDataFrame,
+  `(w, s, e, n)` bbox, or `(lon, lat)` plus `buffer_m`.
+* **One tile per call**, chosen automatically (the tile that best contains
+  the AOI) or with `tile="14TQL"`. Nothing is reprojected on read, so the
+  radiometry is untouched. The window is snapped outwards to 140 m so that
+  one ECOSTRESS 70 m cell is exactly 7 x 7 S2 10 m pixels.
+* **Variables**: `obs`, `obs_unc`, `valid`, coarse-grid `sza/saa/vza/vaa`
+  (azimuths clockwise from true north, `vaa` = pixel-to-sensor), and
+  `inside_aoi` (fraction of each pixel inside the polygon). See
+  `reframe.md` for the full schema.
+* **Credentials**: S2 on AWS needs none. ECOSTRESS needs an Earthdata login
+  in `~/.netrc` (`machine urs.earthdata.nasa.gov login ... password ...`).
+* Install with `pip install -e ".[xr]"`; Python >= 3.12.
+
+Notes on what the data are:
+
+* **Sentinel-2 on AWS**: the BOA offset (-1000 DN, baseline >= 04.00) is
+  *already applied* in the Earth Search COGs, for every item, whatever
+  `earthsearch:boa_offset_applied` says (checked against Planetary
+  Computer, 2019-2025). Both the eager readers and `eof.xr` therefore use
+  `DN / 1e4` on AWS and `(DN - 1000) / 1e4` on Planetary. Releases before
+  this fix subtracted the offset twice on AWS, giving reflectance about
+  0.1 too low (clipped at 0); they also computed a wrong SZA on Planetary
+  and wrote output on a grid offset from the native tile grid. Cached
+  `.npz` files from before the fix are ignored (new files end in `_g2`).
+* **ECOSTRESS view geometry**: L2T `view_zenith` exists only where LST was
+  produced (cloud-free, often 10-20 % of a tile). Over cloudy AOIs VZA is
+  modelled from all L2T scenes of the same orbit (plane fit), and VAA comes
+  from its gradient. Orbits with no L2T granule at all have NaN `vza/vaa`.
+  Angles are good to a few degrees, which is what the SAIL-type use needs.
+* **ECOSTRESS uncertainty** uses NEdT at the observed brightness
+  temperature, with a monochromatic Planck function at the band centre (no
+  SRFs are bundled for ECOSTRESS yet).
+
 ## API Reference
 
 ### `eof.get_s2_data(start_date, end_date, geojson_path, data_folder=None, source='auto', max_cloud_cover=80)`
