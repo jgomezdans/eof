@@ -20,6 +20,9 @@ class SourceConfig:
     transform_href: Optional[Callable] = None
     vsi_prefix: str = "/vsicurl"
     s3_endpoint: Optional[str] = None
+    # True if the BOA offset (-1000 DN, baseline >= 04.00) is already in
+    # the stored values and must not be subtracted again.
+    boa_offset_in_dn: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -143,12 +146,17 @@ def _configure_gdal_for_planetary(**kwargs):
 
 
 def _planetary_sign_href(href):
-    """Sign an Azure Blob Storage URL using planetary_computer."""
+    """Sign an Azure Blob Storage URL.
+
+    Uses the ``planetary_computer`` package if installed, otherwise
+    fetches a SAS token directly (no extra dependency).
+    """
     try:
         import planetary_computer
         return planetary_computer.sign_url(href)
     except ImportError:
-        return href
+        from eof.xr._env import sign_planetary
+        return sign_planetary(href)
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +189,7 @@ AWS_CONFIG = SourceConfig(
     processing_baseline_property='s2:processing_baseline',
     mgrs_property_keys=['grid:code', 'mgrs:grid_square', 's2:mgrs_tile'],
     configure_gdal=_configure_gdal_for_aws,
+    boa_offset_in_dn=True,
 )
 
 PLANETARY_CONFIG = SourceConfig(

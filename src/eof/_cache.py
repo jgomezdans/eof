@@ -14,9 +14,11 @@ def get_cache_path(item_id: str, data_folder: str, sensor: str = None) -> str:
             If None, uses legacy format compatible with S2 caches.
     """
     safe_id = item_id.replace('/', '_').replace('\\', '_')
+    # "_g2": output grid aligned to multiples of the pixel size (older
+    # caches are on an offset grid and are deliberately not reused)
     if sensor and sensor != "sentinel2":
-        return os.path.join(data_folder, f"{sensor}_{safe_id}.npz")
-    return os.path.join(data_folder, f"{safe_id}.npz")
+        return os.path.join(data_folder, f"{sensor}_{safe_id}_g2.npz")
+    return os.path.join(data_folder, f"{safe_id}_g2.npz")
 
 
 def save_to_cache(cache_path: str, band_data: np.ndarray, qa_data: np.ndarray,

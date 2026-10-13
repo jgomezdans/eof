@@ -28,7 +28,8 @@ def _s2_dn_to_reflectance(dn: np.ndarray, metadata: dict = None) -> np.ndarray:
     # with processing baseline logic. Called only from the generic path.
     from eof._scl import dn_to_reflectance
     baseline = (metadata or {}).get("processing_baseline", "05.00")
-    return dn_to_reflectance(dn, baseline)
+    return dn_to_reflectance(
+        dn, baseline, (metadata or {}).get("boa_offset_in_dn", False))
 
 
 def _landsat_dn_to_reflectance(dn: np.ndarray, metadata: dict = None) -> np.ndarray:

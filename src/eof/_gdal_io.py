@@ -61,6 +61,7 @@ def read_and_crop_band(href: str, geojson_cutline: str, semaphore: threading.Sem
             cutlineDSName=geojson_cutline,
             cutlineSRS="EPSG:4326",   # tell GDAL the CRS
             cropToCutline=True,
+            targetAlignedPixels=True,   # output on the native 10 m tile grid
             xRes=target_resolution,
             yRes=target_resolution,
             resampleAlg=resample_map.get(resample_alg, gdal.GRA_Bilinear),

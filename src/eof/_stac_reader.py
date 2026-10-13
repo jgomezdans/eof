@@ -441,18 +441,20 @@ class STACReader:
     def _extract_angles(self, item) -> tuple:
         """Extract (SZA, VZA, RAA) in degrees from STAC item properties."""
         props = item.properties
-        sun_elevation = props.get("view:sun_elevation",
-                                  props.get("s2:mean_solar_zenith", 0.0))
+        # AWS carries view:sun_elevation; Planetary carries
+        # s2:mean_solar_zenith (already a zenith: do not take 90 - x).
+        if "view:sun_elevation" in props:
+            sun_elevation = props["view:sun_elevation"]
+        elif "s2:mean_solar_zenith" in props:
+            sun_elevation = 90.0 - props["s2:mean_solar_zenith"]
+        else:
+            sun_elevation = 0.0
         sun_azimuth = props.get("view:sun_azimuth",
                                 props.get("s2:mean_solar_azimuth", 0.0))
         view_zenith = props.get("view:incidence_angle", 0.0)
         view_azimuth = props.get("view:azimuth", 0.0)
 
-        # Handle elevation vs zenith
-        if sun_elevation < 90:
-            sza = 90.0 - sun_elevation
-        else:
-            sza = sun_elevation
+        sza = 90.0 - sun_elevation
 
         raa = (view_azimuth - sun_azimuth) % 360.0
         return sza, view_zenith, raa
@@ -530,7 +532,8 @@ class STACReader:
         baseline = item.properties.get(
             self.config.processing_baseline_property, '05.00'
         )
-        reflectance = dn_to_reflectance(band_data, baseline)
+        reflectance = dn_to_reflectance(
+            band_data, baseline, self.config.boa_offset_in_dn)
         reflectance = apply_scl_cloud_mask(reflectance, scl_data)
 
         return reflectance, geotransform, crs
@@ -621,6 +624,7 @@ class STACReader:
         metadata["processing_baseline"] = metadata.get(
             self.config.processing_baseline_property, "05.00"
         )
+        metadata["boa_offset_in_dn"] = self.config.boa_offset_in_dn
         reflectance = sensor_config.dn_to_reflectance(band_data, metadata)
 
         # Cloud masking

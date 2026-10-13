@@ -16,11 +16,16 @@ def apply_scl_cloud_mask(reflectance: np.ndarray, scl: np.ndarray) -> np.ndarray
     return reflectance
 
 
-def dn_to_reflectance(dn: np.ndarray, processing_baseline: str) -> np.ndarray:
+def dn_to_reflectance(dn: np.ndarray, processing_baseline: str,
+                      offset_in_dn: bool = False) -> np.ndarray:
     """
     Convert integer DN values to float32 reflectance [0, 1].
 
-    For processing baseline >= 04.00, applies BOA_ADD_OFFSET of -1000.
+    For processing baseline >= 04.00, applies BOA_ADD_OFFSET of -1000,
+    unless ``offset_in_dn`` is True, meaning the source has already
+    subtracted it from the stored values (AWS Earth Search: DN is 1000
+    lower than the ESA original for every baseline >= 04.00 item,
+    whatever ``earthsearch:boa_offset_applied`` says).
     """
     try:
         baseline_major = int(processing_baseline.split('.')[0])
@@ -28,7 +33,7 @@ def dn_to_reflectance(dn: np.ndarray, processing_baseline: str) -> np.ndarray:
         baseline_major = 5  # default to recent baseline
 
     refl = dn.astype(np.float32)
-    if baseline_major >= 4:
+    if baseline_major >= 4 and not offset_in_dn:
         refl = (refl + BASELINE_OFFSET) / QUANTIFICATION_VALUE
     else:
         refl = refl / QUANTIFICATION_VALUE
